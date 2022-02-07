@@ -3,7 +3,7 @@ mod test {
     use pgn_reader::{BufferedReader, SanPlus, Skip};
     use shakmaty::{Chess, Move, Position};
 
-    use crate::{compress, decompress};
+    use crate::{compress, decompress, Error};
 
     fn parse(line: &str) -> Vec<Move> {
         let mut reader = BufferedReader::new_cursor(line);
@@ -12,32 +12,35 @@ mod test {
     }
 
     #[test]
-    fn round_trip() {
+    fn round_trip() -> Result<(), Error> {
         for line in PGNS {
             let moves = parse(line);
-            let compressed = compress(&moves);
-            let decompressed = decompress(compressed.as_slice(), moves.len() as i32);
+            let compressed = compress(&moves)?;
+            let decompressed = decompress(compressed.as_slice(), moves.len() as i32)?;
             assert_eq!(moves, decompressed);
         }
+        Ok(())
     }
 
     #[test]
-    fn stable_format() {
+    fn stable_format() -> Result<(), Error> {
         for (base64, line) in ENCODED.iter().zip(PGNS) {
             let compressed = base64::decode(base64).unwrap();
             let plies = line.split(' ').count();
             let line_moves = parse(line);
-            let decompressed_moves = decompress(compressed.as_slice(), plies as i32);
+            let decompressed_moves = decompress(compressed.as_slice(), plies as i32)?;
             assert_eq!(line_moves, decompressed_moves);
         }
+        Ok(())
     }
 
     #[test]
-    fn least_surprise() {
+    fn least_surprise() -> Result<(), Error> {
         let bytes: [u8; 22] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
         let parsed = parse("e4 e5 Nf3 Nf6 Nxe5 Nxe4 Nxf7 Kxf7 d4 Nxf2 Kxf2 d5 Nc3 Nc6 Nxd5 Qxd5 Kg1 Nxd4 Qxd4 Qxd4+ Be3 Qxe3#");
-        let decompressed = decompress(&bytes[..], 22);
+        let decompressed = decompress(&bytes[..], 22)?;
         assert_eq!(parsed, decompressed);
+        Ok(())
     }
 
     const PGNS: [&str; 114] = [

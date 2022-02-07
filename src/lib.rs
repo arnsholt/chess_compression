@@ -1,4 +1,6 @@
-//! TODO: Crate description
+//! A library for compressing chess moves. This is a straight Rust port of a
+//! [Java original](https://github.com/lichess-org/compression/) made by the
+//! Lichess project, but with a slightly different user-facing API.
 
 #[macro_use]
 extern crate lazy_static;
@@ -6,52 +8,96 @@ extern crate lazy_static;
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
 use shakmaty::{Chess, Color, Move, Position, Role, Setup};
+use std::fmt::Formatter;
 use std::io::{Read, Write};
 
 #[cfg(test)]
 mod tests;
 
+/* Public API: */
+
+#[derive(Debug)]
+pub enum Error {
+    IO(std::io::Error),
+    Chess(shakmaty::PlayError<Chess>),
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::IO(e) => Some(e),
+            Self::Chess(e) => Some(e),
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::IO(e) => write!(f, "IO error: {}", e),
+            Self::Chess(e) => write!(f, "Chess error: {}", e),
+        }
+    }
+}
+
 /// TODO: Documentation
-pub fn compress(moves: &[Move]) -> Vec<u8> {
-    let mut position = Chess::default();
+pub fn compress(moves: &[Move]) -> Result<Vec<u8>, Error> {
+    compress_from_position(moves, Chess::default())
+}
+
+/// TODO: Documentation
+pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>, Error> {
+    let mut position = position;
     let mut output = Vec::new();
     let mut writer = BitWriter::new(&mut output);
     for m in moves {
-        write_move(m, &position, &mut writer);
-        position = position.play(m).unwrap();
+        write_move(m, &position, &mut writer)?;
+        position = position.play(m).map_err(Error::Chess)?;
     }
-    writer.pad_to_byte().unwrap();
-    output
+    writer.pad_to_byte().map_err(Error::IO)?;
+    Ok(output)
 }
 
 /// TODO: Documentation
-pub fn decompress<R: Read>(input: R, plies: i32) -> Vec<Move> {
+pub fn decompress<R: Read>(input: R, plies: i32) -> Result<Vec<Move>, Error> {
+    decompress_from_position(input, plies, Chess::default())
+}
+
+/// TODO: Documentation
+pub fn decompress_from_position<R: Read>(input: R, plies: i32, position: Chess) -> Result<Vec<Move>, Error> {
     let mut reader = BitReader::<_, MSB>::new(input);
-    let mut position = Chess::default();
+    let mut position = position;
     let mut moves = Vec::new();
 
     for _i in 0..plies {
-        let m = read_move(&mut reader, &position);
-        position = position.play(&m).unwrap();
+        let m = read_move(&mut reader, &position)?;
+        position = position.play(&m).map_err(Error::Chess)?;
         moves.push(m);
     }
 
-    moves
+    Ok(moves)
 }
 
-/// TODO: Documentation
-pub fn write_move<W: Write>(m: &Move, position: &Chess, writer: &mut BitWriter<W>) {
+/// Low-level function writing a single compressed move to a [`BitWriter`].
+///
+/// Remember that the writer buffers partially-written bytes, so your output
+/// will be truncated if you forget to call [`BitWriter::pad_to_byte`] after
+/// you have written all your moves.
+pub fn write_move<W: Write>(m: &Move, position: &Chess, writer: &mut BitWriter<W>) -> Result<(), Error> {
     let moves = sorted_moves(position);
+    // TODO: Remove unwrap() here.
     let idx = moves.into_iter().position(|r| r == *m).unwrap();
-    write(idx as u8, writer);
+    write(idx as u8, writer)
 }
 
 /// TODO: Documentation
-pub fn read_move<R: Read>(reader: &mut BitReader<R, MSB>, position: &Chess) -> Move {
-    let idx = read(reader);
+pub fn read_move<R: Read>(reader: &mut BitReader<R, MSB>, position: &Chess) -> Result<Move, Error> {
+    let idx = read(reader)?;
     let moves = sorted_moves(position);
-    moves[idx as usize].clone()
+    Ok(moves[idx as usize].clone())
 }
+
+/* Internal API implementing the compression: */
 
 struct Symbol (u32, u8);
 
@@ -383,6 +429,8 @@ fn move_value(position: &Chess, m: &Move) -> i32 {
     let role_idx = usize::from(m.role()) - 1;
     let flip = position.turn() == Color::White;
     let to = m.to();
+    /* XXX: Safe to unwrap here, since we only support Chess, but *will* be
+     * None if we ever support crazyhouse or other variants with drops: */
     let from = m.from().unwrap();
     let (to_idx, from_idx): (usize, usize) = if flip {
         (to.flip_vertical().into(), from.flip_vertical().into())
@@ -409,6 +457,8 @@ fn move_score(m: &Move, position: &Chess) -> i32 {
         + (defending_pawn_score << 22)
         + ((512 + move_value) << 12)
         + (i32::from(m.to()) << 6)
+        /* XXX: Safe to unwrap here, since we only support Chess, but *will*
+         * be None if we ever support crazyhouse or other variants with drops: */
         + i32::from(m.from().unwrap());
     -score
 }
@@ -417,24 +467,24 @@ fn sorted_moves(position: &Chess) -> Vec<Move> {
     position.legal_moves().into_iter().sorted_by_key(|m| move_score(m, position)).collect()
 }
 
-fn write<W: Write>(value: u8, writer: &mut BitWriter<W>) {
+fn write<W: Write>(value: u8, writer: &mut BitWriter<W>) -> Result<(), Error> {
     let code = &CODES[value as usize];
-    writer.write_bits(code.0, code.1 as usize).expect("Failed to write bits");
+    writer.write_bits(code.0, code.1 as usize).map_err(Error::IO)
 }
 
-fn read<R: Read>(reader: &mut BitReader<R, MSB>) -> u8 {
+fn read<R: Read>(reader: &mut BitReader<R, MSB>) -> Result<u8, Error> {
     let mut node: &Node = &*ROOT;
     loop {
         match node {
             Node::Interior { zero, one } => {
-                node = if reader.read_bit().expect("Ran out of bits to read") {
+                node = if reader.read_bit().map_err(Error::IO)? {
                     one
                 }
                 else {
                     zero
                 };
             },
-            Node::Leaf(n) => return *n,
+            Node::Leaf(n) => return Ok(*n),
         }
     }
 }
