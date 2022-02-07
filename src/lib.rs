@@ -20,6 +20,7 @@ mod tests;
 pub enum Error {
     IO(std::io::Error),
     Chess(shakmaty::PlayError<Chess>),
+    MoveNotFound,
 }
 
 impl std::error::Error for Error {
@@ -27,6 +28,7 @@ impl std::error::Error for Error {
         match self {
             Self::IO(e) => Some(e),
             Self::Chess(e) => Some(e),
+            Self::MoveNotFound => None,
         }
     }
 }
@@ -36,6 +38,7 @@ impl std::fmt::Display for Error {
         match self {
             Self::IO(e) => write!(f, "IO error: {}", e),
             Self::Chess(e) => write!(f, "Chess error: {}", e),
+            Self::MoveNotFound => write!(f, "Move not found in sorted move list"),
         }
     }
 }
@@ -85,8 +88,7 @@ pub fn decompress_from_position<R: Read>(input: R, plies: i32, position: Chess) 
 /// you have written all your moves.
 pub fn write_move<W: Write>(m: &Move, position: &Chess, writer: &mut BitWriter<W>) -> Result<(), Error> {
     let moves = sorted_moves(position);
-    // TODO: Remove unwrap() here.
-    let idx = moves.into_iter().position(|r| r == *m).unwrap();
+    let idx = moves.into_iter().position(|r| r == *m).map_err(Error::MoveNotFound)?;
     write(idx as u8, writer)
 }
 
