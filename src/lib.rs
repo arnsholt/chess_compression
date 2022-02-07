@@ -99,8 +99,13 @@ pub fn decompress_from_position<R: Read>(input: R, plies: i32, position: Chess) 
 /// you have written all your moves.
 pub fn write_move<W: Write>(m: &Move, position: &Chess, writer: &mut BitWriter<W>) -> Result<(), Error> {
     let moves = sorted_moves(position);
-    let idx = moves.into_iter().position(|r| r == *m).map_err(Error::MoveNotFound)?;
-    write(idx as u8, writer)
+    let idx = moves.into_iter().position(|r| r == *m);
+    if let Some(idx) = idx {
+        write(idx as u8, writer)
+    }
+    else {
+        Err(Error::MoveNotFound)
+    }
 }
 
 /// TODO: Documentation
