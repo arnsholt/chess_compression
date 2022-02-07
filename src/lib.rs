@@ -1,6 +1,11 @@
 //! A library for compressing chess moves. This is a straight Rust port of a
 //! [Java original](https://github.com/lichess-org/compression/) made by the
 //! Lichess project, but with a slightly different user-facing API.
+//!
+//! Note that when decompressing, you need to know how many plies you want to
+//! decompress. This is because a given move sequence is not guaranteed to
+//! fill the last byte exactly. In this case, any trailing bits in the input
+//! would cause havoc if we didn't know how many elements to decompress.
 
 #[macro_use]
 extern crate lazy_static;
@@ -16,10 +21,16 @@ mod tests;
 
 /* Public API: */
 
+/// Errors that can occur when decompressing or compressing moves.
 #[derive(Debug)]
 pub enum Error {
+    /// I/O error from the underlying [`BitReader`] or [`BitWriter`].
     IO(std::io::Error),
+    /// Error when applying a move to a position during compression or
+    /// decompression.
     Chess(shakmaty::PlayError<Chess>),
+    /// Failure to find the move to compress in the list of legal moves in the
+    /// target position.
     MoveNotFound,
 }
 
@@ -43,12 +54,12 @@ impl std::fmt::Display for Error {
     }
 }
 
-/// TODO: Documentation
+/// Compress a sequence of moves from the starting position.
 pub fn compress(moves: &[Move]) -> Result<Vec<u8>, Error> {
     compress_from_position(moves, Chess::default())
 }
 
-/// TODO: Documentation
+/// Compress a sequence of moves from a given position.
 pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>, Error> {
     let mut position = position;
     let mut output = Vec::new();
@@ -61,12 +72,12 @@ pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>
     Ok(output)
 }
 
-/// TODO: Documentation
+/// Decompress a given number of moves from the starting position.
 pub fn decompress<R: Read>(input: R, plies: i32) -> Result<Vec<Move>, Error> {
     decompress_from_position(input, plies, Chess::default())
 }
 
-/// TODO: Documentation
+/// Decompress a given number of moves from a given position.
 pub fn decompress_from_position<R: Read>(input: R, plies: i32, position: Chess) -> Result<Vec<Move>, Error> {
     let mut reader = BitReader::<_, MSB>::new(input);
     let mut position = position;
