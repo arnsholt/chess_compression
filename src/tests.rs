@@ -23,7 +23,7 @@ mod test {
 
     #[test]
     fn stable_format() {
-        for (base64, line) in std::iter::zip(ENCODED, PGNS) {
+        for (base64, line) in ENCODED.iter().zip(PGNS) {
             let compressed = base64::decode(base64).unwrap();
             let plies = line.split(' ').count();
             let line_moves = parse(line);
