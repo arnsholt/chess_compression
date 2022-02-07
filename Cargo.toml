@@ -1,0 +1,17 @@
+[package]
+name = "chess_compression"
+version = "0.1.0"
+edition = "2021"
+license = "AGPL-3.0-or-later"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bitbit = "0.2"
+itertools = "0.10"
+lazy_static = "1.4"
+shakmaty = "0.20"
+
+[dev-dependencies]
+base64 = "0.13"
+pgn-reader = "0.19"
