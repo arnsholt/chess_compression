@@ -12,7 +12,7 @@ extern crate lazy_static;
 
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
-use shakmaty::{Chess, Color, Move, Position, Role, Setup};
+use shakmaty::{Chess, Color, Move, Position, Role};
 use std::fmt::Formatter;
 use std::io::{Read, Write};
 

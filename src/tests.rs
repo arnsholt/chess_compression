@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod test {
+    use base64::Engine;
     use pgn_reader::{BufferedReader, SanPlus, Skip};
     use shakmaty::{Chess, Move, Position};
 
@@ -25,7 +26,7 @@ mod test {
     #[test]
     fn stable_format() -> Result<(), Error> {
         for (base64, line) in ENCODED.iter().zip(PGNS) {
-            let compressed = base64::decode(base64).unwrap();
+            let compressed = base64::prelude::BASE64_STANDARD.decode(base64).unwrap();
             let plies = line.split(' ').count();
             let line_moves = parse(line);
             let decompressed_moves = decompress(compressed.as_slice(), plies as i32)?;
