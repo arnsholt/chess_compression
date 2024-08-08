@@ -10,8 +10,8 @@ repository = "https://github.com/arnsholt/chess_compression"
 bitbit = "0.2"
 itertools = "0.10"
 lazy_static = "1.4"
-shakmaty = "0.20"
+shakmaty = "0.27"
 
 [dev-dependencies]
-base64 = "0.13"
-pgn-reader = "0.19"
+base64 = "0.22"
+pgn-reader = "0.26"
