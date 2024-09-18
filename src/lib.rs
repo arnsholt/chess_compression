@@ -108,7 +108,7 @@ pub fn write_move<W: Write>(m: &Move, position: &Chess, writer: &mut BitWriter<W
     }
 }
 
-/// TODO: Documentation
+/// Low-level function that reads a single move from a [`BitReader`].
 pub fn read_move<R: Read>(reader: &mut BitReader<R, MSB>, position: &Chess) -> Result<Move, Error> {
     let idx = read(reader)?;
     let moves = sorted_moves(position);
