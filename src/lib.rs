@@ -491,7 +491,7 @@ fn write<W: Write>(value: u8, writer: &mut BitWriter<W>) -> Result<(), Error> {
 }
 
 fn read<R: Read>(reader: &mut BitReader<R, MSB>) -> Result<u8, Error> {
-    let mut node: &Node = &*ROOT;
+    let mut node: &Node = &ROOT;
     loop {
         match node {
             Node::Interior { zero, one } => {
