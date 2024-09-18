@@ -28,7 +28,7 @@ pub enum Error {
     IO(std::io::Error),
     /// Error when applying a move to a position during compression or
     /// decompression.
-    Chess(shakmaty::PlayError<Chess>),
+    Chess(Box<shakmaty::PlayError<Chess>>),
     /// Failure to find the move to compress in the list of legal moves in the
     /// target position.
     MoveNotFound,
@@ -66,7 +66,7 @@ pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>
     let mut writer = BitWriter::new(&mut output);
     for m in moves {
         write_move(m, &position, &mut writer)?;
-        position = position.play(m).map_err(Error::Chess)?;
+        position = position.play(m).map_err(|e| Error::Chess(Box::new(e)))?;
     }
     writer.pad_to_byte().map_err(Error::IO)?;
     Ok(output)
@@ -85,7 +85,7 @@ pub fn decompress_from_position<R: Read>(input: R, plies: i32, position: Chess) 
 
     for _i in 0..plies {
         let m = read_move(&mut reader, &position)?;
-        position = position.play(&m).map_err(Error::Chess)?;
+        position = position.play(&m).map_err(|e| Error::Chess(Box::new(e)))?;
         moves.push(m);
     }
 
