@@ -8,7 +8,10 @@ mod test {
 
     fn parse(line: &str) -> Vec<Move> {
         let mut reader = BufferedReader::new_cursor(line);
-        let mut visitor = Visitor { position: Chess::default(), moves: Vec::new() };
+        let mut visitor = Visitor {
+            position: Chess::default(),
+            moves: Vec::new(),
+        };
         reader.read_game(&mut visitor).unwrap().unwrap()
     }
 
@@ -37,7 +40,9 @@ mod test {
 
     #[test]
     fn least_surprise() -> Result<(), Error> {
-        let bytes: [u8; 22] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let bytes: [u8; 22] = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        ];
         let parsed = parse("e4 e5 Nf3 Nf6 Nxe5 Nxe4 Nxf7 Kxf7 d4 Nxf2 Kxf2 d5 Nc3 Nc6 Nxd5 Qxd5 Kg1 Nxd4 Qxd4 Qxd4+ Be3 Qxe3#");
         let decompressed = decompress(&bytes[..], 22)?;
         assert_eq!(parsed, decompressed);
@@ -294,10 +299,15 @@ mod test {
             std::mem::take(&mut self.moves)
         }
 
-        fn begin_variation(&mut self) -> Skip { Skip(true) }
+        fn begin_variation(&mut self) -> Skip {
+            Skip(true)
+        }
 
         fn san(&mut self, san: SanPlus) {
-            let m = san.san.to_move(&self.position).expect("Bad algebraic notation");
+            let m = san
+                .san
+                .to_move(&self.position)
+                .expect("Bad algebraic notation");
             self.position.play_unchecked(&m);
             self.moves.push(m);
         }

@@ -10,17 +10,17 @@
 #[macro_use]
 extern crate lazy_static;
 
-//use bitbit::{BitReader, BitWriter};
-use shakmaty::{Chess};
+use shakmaty::Chess;
 use std::fmt::Formatter;
-//use std::io::{Read, Write};
 
+mod moves;
 #[cfg(test)]
 mod tests;
-mod moves;
 
-pub use moves::{compress, compress_from_position, decompress, decompress_from_position, read_move, write_move};
-
+pub use moves::{
+    compress, compress_from_position, decompress, decompress_from_position, read_move, write_move,
+};
+pub use position::{compress_position, decompress_position};
 
 /// Errors that can occur when decompressing or compressing moves.
 #[derive(Debug)]
