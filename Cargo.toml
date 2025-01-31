@@ -10,6 +10,7 @@ repository = "https://github.com/arnsholt/chess_compression"
 bitbit = "0.2"
 itertools = "0.10"
 lazy_static = "1.4"
+leb128 = "0.2"
 shakmaty = "0.27"
 
 [dev-dependencies]

@@ -10,10 +10,11 @@
 #[macro_use]
 extern crate lazy_static;
 
-use shakmaty::Chess;
+use shakmaty::{Chess, Setup, Square};
 use std::fmt::Formatter;
 
 mod moves;
+mod position;
 #[cfg(test)]
 mod tests;
 
@@ -34,6 +35,13 @@ pub enum Error {
     /// Failure to find the move to compress in the list of legal moves in the
     /// target position.
     MoveNotFound,
+    /// Not enough bytes to decompress a position.
+    MissingBytes,
+    /// Returned if square offsetting via
+    /// [`Square::offset`](Square::offset) fails. This should never
+    /// happen.
+    SquareOffsetError(Square, i32),
+    MissingPiece(Box<Setup>, Square),
 }
 
 impl std::error::Error for Error {
@@ -41,7 +49,7 @@ impl std::error::Error for Error {
         match self {
             Self::IO(e) => Some(e),
             Self::Chess(e) => Some(e),
-            Self::MoveNotFound => None,
+            _ => None,
         }
     }
 }
@@ -52,6 +60,27 @@ impl std::fmt::Display for Error {
             Self::IO(e) => write!(f, "IO error: {}", e),
             Self::Chess(e) => write!(f, "Chess error: {}", e),
             Self::MoveNotFound => write!(f, "Move not found in sorted move list"),
+            Self::MissingBytes => write!(f, "Not enough bytes in data to decompress position"),
+            Self::SquareOffsetError(square, offset) => {
+                write!(f, "Failed to offset square {square} by {offset}")
+            }
+            Self::MissingPiece(position, square) => write!(
+                f,
+                "Missing piece at {square} in {}",
+                shakmaty::fen::Fen::from_setup(*position.clone())
+            ),
         }
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(value: std::io::Error) -> Self {
+        Self::IO(value)
+    }
+}
+
+impl From<leb128::read::Error> for Error {
+    fn from(_value: leb128::read::Error) -> Self {
+        todo!()
     }
 }

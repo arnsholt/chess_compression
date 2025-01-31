@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod test {
+mod test_move_compression {
     // These tests are copied from the Lichess compression tests:
     // https://github.com/lichess-org/compression/blob/master/src/test/scala/HuffmanPgnTest.scala
     use base64::Engine;
@@ -313,5 +313,45 @@ mod test {
             self.position.play_unchecked(&m);
             self.moves.push(m);
         }
+    }
+}
+
+mod test_position_compression {
+    use crate::{compress_position, decompress_position, Error};
+    use shakmaty::fen::Fen;
+
+    #[test]
+    fn test_roundtrips() -> Result<(), Error> {
+        // These tests are copied from the Lichess scalachess tests:
+        // https://github.com/lichess-org/scalachess/blob/31cdcb1b309e6c368c78ebf7f5832e2df9ff83eb/test-kit/src/test/scala/format/BinaryFenTest.scala
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 1")?;
+        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 1")?;
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 2")?;
+        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 2")?;
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 100 432")?;
+        assert_roundtrip("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")?;
+        assert_roundtrip("4nrk1/1pp3pp/p4p2/4P3/2BB1n2/8/PP3P1P/2K3R1 b - - 1 25")?;
+        assert_roundtrip("5k2/6p1/8/1Pp5/6P1/8/8/3K4 w - c6 0 1")?;
+        assert_roundtrip("4k3/8/8/8/3pP3/8/6N1/7K b - e3 0 1")?;
+        assert_roundtrip("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")?;
+        assert_roundtrip("r1k1r2q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K1R2Q w KQkq - 0 1")?;
+        assert_roundtrip("r1k2r1q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K2R1Q w KQkq - 0 1")?;
+        assert_roundtrip("8/8/8/4B2b/6nN/8/5P2/2R1K2k w Q - 1 1")?;
+        assert_roundtrip("2r5/8/8/8/8/8/6PP/k2KR3 w K - 0 2")?;
+        assert_roundtrip("8/8/8/1k6/3Pp3/8/8/4KQ2 b - d3 3 1")?;
+        assert_roundtrip("r2r3k/p7/3p4/8/8/P6P/8/R3K2R b KQq - 0 4")?;
+
+        Ok(())
+    }
+
+    fn assert_roundtrip(fen: &str) -> Result<(), Error> {
+        println!("{fen}");
+        let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
+
+        let roundtrip = decompress_position(&compress_position(&position)?)?;
+
+        assert_eq!(fen, format!("{}", Fen::from_setup(roundtrip)));
+
+        Ok(())
     }
 }
