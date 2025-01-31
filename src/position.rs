@@ -1,4 +1,14 @@
-//! TODO: Module docs.
+//! Functions for compressing and decompressing chess positions. For a
+//! detailed description, see the [blog post] and [code], but in brief the
+//! position is compressed to a variable number of bytes:
+//!
+//! - A 64-bit BE int encoding which squares are occupied
+//! - A sequence of bytes encoding the pieces on squares, two per byte.
+//!   Special values encode castling rights, en passant and side to move.
+//! - Optionally, LEB128-encoded halfmove clock and number of plies played
+//!
+//! [blog post]: https://lichess.org/@/revoof/blog/adapting-nnue-pytorchs-binary-position-format-for-lichess/cpeeAMeY
+//! [code]: https://github.com/lichess-org/scalachess/blob/master/core/src/main/scala/format/BinaryFen.scala
 
 use shakmaty::{
     Bitboard,
