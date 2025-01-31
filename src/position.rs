@@ -9,7 +9,7 @@ use std::num::NonZero;
 
 use crate::Error;
 
-/// TODO
+/// Compress a position.
 pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
     let mut result = Vec::new();
 
@@ -32,7 +32,7 @@ pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
     let mut occupied_iter = occupied.into_iter();
     while let Some((sq, maybe_sq)) = occupied_iter.next().map(|sq| (sq, occupied_iter.next())) {
         let black_turn = position.turn == Black;
-        let upper_half = piece_value(
+        let lower_half = piece_value(
             board
                 .piece_at(sq)
                 .ok_or_else(|| Error::MissingPiece(Box::new(position.clone()), sq))?,
@@ -40,8 +40,8 @@ pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
             black_turn,
             position.castling_rights,
             pawn_pushed_to,
-        ) << 4;
-        let lower_half = maybe_sq
+        );
+        let upper_half = maybe_sq
             .map(|sq| {
                 Ok::<_, Error>(piece_value(
                     board
@@ -55,7 +55,7 @@ pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
             })
             .transpose()?
             .unwrap_or(0);
-        result.push(upper_half | lower_half);
+        result.push((upper_half << 4) | lower_half);
     }
 
     let ply = (position.fullmoves.get() - 1) * 2 + if position.turn == Black { 1 } else { 0 };
@@ -154,7 +154,7 @@ fn piece_value(
     }
 }
 
-/// TODO
+/// Decompress a position.
 pub fn decompress_position(mut bytes: &[u8]) -> Result<Setup, Error> {
     let occupied = Bitboard(u64::from_be_bytes(
         bytes
@@ -172,9 +172,9 @@ pub fn decompress_position(mut bytes: &[u8]) -> Result<Setup, Error> {
         let value = if read_more {
             byte = *bytes.get(i).ok_or(Error::MissingBytes)?;
             i += 1;
-            (byte & 0xf0) >> 4
-        } else {
             byte & 0x0f
+        } else {
+            (byte & 0xf0) >> 4
         };
         read_more = !read_more;
 

@@ -354,4 +354,34 @@ mod test_position_compression {
 
         Ok(())
     }
+
+    #[test]
+    fn test_stable_format() -> Result<(), Error> {
+        assert_stability("8/8/8/8/8/8/8/8 w - - 0 1", "0000000000000000")?;
+        assert_stability("8/8/8/8/8/8/8/8 b - - 0 1", "00000000000000000001")?;
+        assert_stability("8/8/8/8/8/8/8/8 b - - 100 432", "000000000000000064df06")?;
+        assert_stability(
+            "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
+            "ffff00001000efff2d844ad200000000111111113e955fe3",
+        )?;
+        assert_stability(
+            "5k2/6p1/8/1Pp5/6P1/8/8/3K4 w - c6 0 1",
+            "20400006400000080ac0b1",
+        )?;
+        assert_stability(
+            "4k3/8/8/8/3pP3/8/6N1/7K b - e3 0 1",
+            "10000000180040802ac10f",
+        )?;
+
+        Ok(())
+    }
+
+    fn assert_stability(fen: &str, encoded_hex: &str) -> Result<(), Error> {
+        let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
+        let expected = hex::decode(encoded_hex).unwrap();
+        let compressed_position = compress_position(&position).unwrap();
+        assert_eq!(compressed_position, expected);
+
+        Ok(())
+    }
 }
