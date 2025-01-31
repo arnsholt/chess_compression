@@ -6,7 +6,8 @@ mod test_move_compression {
     use pgn_reader::{BufferedReader, SanPlus, Skip};
     use shakmaty::{Chess, Move, Position};
 
-    use crate::{compress, decompress, Error};
+    use crate::moves::{compress, decompress};
+    use crate::Error;
 
     fn parse(line: &str) -> Vec<Move> {
         let mut reader = BufferedReader::new_cursor(line);
@@ -317,7 +318,8 @@ mod test_move_compression {
 }
 
 mod test_position_compression {
-    use crate::{compress_position, decompress_position, Error};
+    use crate::position::{compress, decompress};
+    use crate::Error;
     use shakmaty::fen::Fen;
 
     #[test]
@@ -348,7 +350,7 @@ mod test_position_compression {
         println!("{fen}");
         let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
 
-        let roundtrip = decompress_position(&compress_position(&position)?)?;
+        let roundtrip = decompress(&compress(&position)?)?;
 
         assert_eq!(fen, format!("{}", Fen::from_setup(roundtrip)));
 
@@ -379,7 +381,7 @@ mod test_position_compression {
     fn assert_stability(fen: &str, encoded_hex: &str) -> Result<(), Error> {
         let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
         let expected = hex::decode(encoded_hex).unwrap();
-        let compressed_position = compress_position(&position).unwrap();
+        let compressed_position = compress(&position).unwrap();
         assert_eq!(compressed_position, expected);
 
         Ok(())

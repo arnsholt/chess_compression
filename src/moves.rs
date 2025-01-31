@@ -1,3 +1,10 @@
+//! TODO: Module docs.
+//!
+//! Note that when decompressing, you need to know how many plies you want to
+//! decompress. This is because a given move sequence is not guaranteed to
+//! fill the last byte exactly. In this case, any trailing bits in the input
+//! would cause havoc if we didn't know how many elements to decompress.
+
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
 use shakmaty::{Chess, Color, Move, Position, Role};
@@ -8,11 +15,11 @@ use crate::Error;
 /* Public API: */
 /// Compress a sequence of moves from the starting position.
 pub fn compress(moves: &[Move]) -> Result<Vec<u8>, Error> {
-    compress_from_position(moves, Chess::default())
+    compress_from(moves, Chess::default())
 }
 
 /// Compress a sequence of moves from a given position.
-pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>, Error> {
+pub fn compress_from(moves: &[Move], position: Chess) -> Result<Vec<u8>, Error> {
     let mut position = position;
     let mut output = Vec::new();
     let mut writer = BitWriter::new(&mut output);
@@ -26,15 +33,11 @@ pub fn compress_from_position(moves: &[Move], position: Chess) -> Result<Vec<u8>
 
 /// Decompress a given number of moves from the starting position.
 pub fn decompress<R: Read>(input: R, plies: i32) -> Result<Vec<Move>, Error> {
-    decompress_from_position(input, plies, Chess::default())
+    decompress_from(input, plies, Chess::default())
 }
 
 /// Decompress a given number of moves from a given position.
-pub fn decompress_from_position<R: Read>(
-    input: R,
-    plies: i32,
-    position: Chess,
-) -> Result<Vec<Move>, Error> {
+pub fn decompress_from<R: Read>(input: R, plies: i32, position: Chess) -> Result<Vec<Move>, Error> {
     let mut reader = BitReader::<_, MSB>::new(input);
     let mut position = position;
     let mut moves = Vec::new();

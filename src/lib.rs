@@ -1,28 +1,20 @@
 //! A library for compressing chess moves and positions. The code is straight
 //!  ports of [Java](https://github.com/lichess-org/compression/) and
 //! [Scala](https://lichess.org/@/revoof/blog/adapting-nnue-pytorchs-binary-position-format-for-lichess/cpeeAMeY)
-//! originals made by the Lichess project, with some tweaks to the API.
-//!
-//! Note that when decompressing, you need to know how many plies you want to
-//! decompress. This is because a given move sequence is not guaranteed to
-//! fill the last byte exactly. In this case, any trailing bits in the input
-//! would cause havoc if we didn't know how many elements to decompress.
+//! originals made by the Lichess project, with some tweaks to the API. The
+//! code is split into two modules, one for compressing moves and one for
+//! positions.
 
 #[macro_use]
 extern crate lazy_static;
 
-use shakmaty::{Chess, Setup, Square};
+use shakmaty::{Chess, Square};
 use std::fmt::Formatter;
 
-mod moves;
-mod position;
+pub mod moves;
+pub mod position;
 #[cfg(test)]
 mod tests;
-
-pub use moves::{
-    compress, compress_from_position, decompress, decompress_from_position, read_move, write_move,
-};
-pub use position::{compress_position, decompress_position};
 
 /// Errors that can occur when decompressing or compressing moves.
 #[derive(Debug)]
@@ -38,11 +30,11 @@ pub enum Error {
     MoveNotFound,
     /// Not enough bytes to decompress a position.
     MissingBytes,
-    /// Returned if square offsetting via
-    /// [`Square::offset`](Square::offset) fails. This should never
-    /// happen.
+    /// Returned if square offsetting via [`Square::offset`](Square::offset)
+    /// fails. This should never happen.
     SquareOffsetError(Square, i32),
-    MissingPiece(Box<Setup>, Square),
+    /// Error while reading a LEB128 encoded value.
+    Leb128(leb128::read::Error),
 }
 
 impl std::error::Error for Error {
@@ -65,11 +57,7 @@ impl std::fmt::Display for Error {
             Self::SquareOffsetError(square, offset) => {
                 write!(f, "Failed to offset square {square} by {offset}")
             }
-            Self::MissingPiece(position, square) => write!(
-                f,
-                "Missing piece at {square} in {}",
-                shakmaty::fen::Fen::from_setup(*position.clone())
-            ),
+            Self::Leb128(e) => write!(f, "Leb128 error: {}", e),
         }
     }
 }
@@ -81,7 +69,7 @@ impl From<std::io::Error> for Error {
 }
 
 impl From<leb128::read::Error> for Error {
-    fn from(_value: leb128::read::Error) -> Self {
-        todo!()
+    fn from(value: leb128::read::Error) -> Self {
+        Self::Leb128(value)
     }
 }

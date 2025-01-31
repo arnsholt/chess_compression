@@ -1,3 +1,5 @@
+//! TODO: Module docs.
+
 use shakmaty::{
     Bitboard,
     Color::{Black, White},
@@ -10,7 +12,7 @@ use std::num::NonZero;
 use crate::Error;
 
 /// Compress a position.
-pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
+pub fn compress(position: &Setup) -> Result<Vec<u8>, Error> {
     let mut result = Vec::new();
 
     let board = &position.board;
@@ -29,24 +31,23 @@ pub fn compress_position(position: &Setup) -> Result<Vec<u8>, Error> {
         })
         .transpose()?
         .unwrap_or(Bitboard::EMPTY);
-    let mut occupied_iter = occupied.into_iter();
-    while let Some((sq, maybe_sq)) = occupied_iter.next().map(|sq| (sq, occupied_iter.next())) {
+
+    let mut board_iter = board.clone().into_iter();
+    /* We iterate over the occupancy of the board two-by-two, so that we can
+     * fill each byte in the output with a single iteration of the loop. */
+    while let Some(((sq, piece), maybe_pair)) = board_iter.next().map(|v| (v, board_iter.next())) {
         let black_turn = position.turn == Black;
         let lower_half = piece_value(
-            board
-                .piece_at(sq)
-                .ok_or_else(|| Error::MissingPiece(Box::new(position.clone()), sq))?,
+            piece,
             sq,
             black_turn,
             position.castling_rights,
             pawn_pushed_to,
         );
-        let upper_half = maybe_sq
-            .map(|sq| {
+        let upper_half = maybe_pair
+            .map(|(sq, piece)| {
                 Ok::<_, Error>(piece_value(
-                    board
-                        .piece_at(sq)
-                        .ok_or_else(|| Error::MissingPiece(Box::new(position.clone()), sq))?,
+                    piece,
                     sq,
                     black_turn,
                     position.castling_rights,
@@ -155,7 +156,7 @@ fn piece_value(
 }
 
 /// Decompress a position.
-pub fn decompress_position(mut bytes: &[u8]) -> Result<Setup, Error> {
+pub fn decompress(mut bytes: &[u8]) -> Result<Setup, Error> {
     let occupied = Bitboard(u64::from_be_bytes(
         bytes
             .get(0..8)
