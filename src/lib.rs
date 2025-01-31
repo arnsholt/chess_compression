@@ -1,6 +1,7 @@
-//! A library for compressing chess moves. This is a straight Rust port of a
-//! [Java original](https://github.com/lichess-org/compression/) made by the
-//! Lichess project, but with a slightly different user-facing API.
+//! A library for compressing chess moves and positions. The code is straight
+//!  ports of [Java](https://github.com/lichess-org/compression/) and
+//! [Scala](https://lichess.org/@/revoof/blog/adapting-nnue-pytorchs-binary-position-format-for-lichess/cpeeAMeY)
+//! originals made by the Lichess project, with some tweaks to the API.
 //!
 //! Note that when decompressing, you need to know how many plies you want to
 //! decompress. This is because a given move sequence is not guaranteed to
