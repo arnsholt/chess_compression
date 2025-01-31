@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod test {
+    // These tests are copied from the Lichess compression tests:
+    // https://github.com/lichess-org/compression/blob/master/src/test/scala/HuffmanPgnTest.scala
     use base64::Engine;
     use pgn_reader::{BufferedReader, SanPlus, Skip};
     use shakmaty::{Chess, Move, Position};
