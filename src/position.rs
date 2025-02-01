@@ -1,6 +1,10 @@
-//! Functions for compressing and decompressing chess positions. For a
-//! detailed description, see the [blog post] and [code], but in brief the
-//! position is compressed to a variable number of bytes:
+//! Functions for compressing and decompressing chess positions.
+//!
+//! Our API works in terms of shakmaty's [`Setup`] type, a not necessarily
+//! legal position, leaving the handling of illegal positions up to
+//! downstream code. For a detailed description of the compression algorithm,
+//! see the [blog post] and [code], but in brief the position is compressed to
+//! a variable number of bytes:
 //!
 //! - A 64-bit BE int encoding which squares are occupied
 //! - A sequence of bytes encoding the pieces on squares, two per byte.

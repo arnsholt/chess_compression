@@ -1,9 +1,16 @@
-//! TODO: Module docs.
+//! Functions for compressing and decompression sequences of chess moves.
 //!
 //! Note that when decompressing, you need to know how many plies you want to
 //! decompress. This is because a given move sequence is not guaranteed to
-//! fill the last byte exactly. In this case, any trailing bits in the input
+//! fill the last byte exactly,  in which case any trailing bits in the input
 //! would cause havoc if we didn't know how many elements to decompress.
+//!
+//! For a description of the exact compression method, see the [lichess blog]
+//! and the reference [Java implementation].
+//!
+//! [lichess blog]: https://lichess.org/@/lichess/blog/developer-update-275-improved-game-compression/Wqa7GiAA
+//! [Java implementation]: https://github.com/lichess-org/compression
+
 
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
