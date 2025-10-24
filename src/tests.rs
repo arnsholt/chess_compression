@@ -7,7 +7,6 @@ mod test_move_compression {
     use shakmaty::{Chess, Move, Position};
 
     use crate::moves::{compress, decompress};
-    use crate::Error;
 
     fn parse(line: &str) -> Vec<Move> {
         let mut reader = BufferedReader::new_cursor(line);
@@ -19,37 +18,34 @@ mod test_move_compression {
     }
 
     #[test]
-    fn round_trip() -> Result<(), Error> {
+    fn round_trip() {
         for line in PGNS {
             let moves = parse(line);
-            let compressed = compress(&moves)?;
-            let decompressed = decompress(compressed.as_slice(), moves.len() as i32)?;
+            let compressed = compress(&moves).unwrap();
+            let decompressed = decompress(compressed.as_slice(), moves.len() as i32).unwrap();
             assert_eq!(moves, decompressed);
         }
-        Ok(())
     }
 
     #[test]
-    fn stable_format() -> Result<(), Error> {
+    fn stable_format() {
         for (base64, line) in ENCODED.iter().zip(PGNS) {
             let compressed = base64::prelude::BASE64_STANDARD.decode(base64).unwrap();
             let plies = line.split(' ').count();
             let line_moves = parse(line);
-            let decompressed_moves = decompress(compressed.as_slice(), plies as i32)?;
+            let decompressed_moves = decompress(compressed.as_slice(), plies as i32).unwrap();
             assert_eq!(line_moves, decompressed_moves);
         }
-        Ok(())
     }
 
     #[test]
-    fn least_surprise() -> Result<(), Error> {
+    fn least_surprise() {
         let bytes: [u8; 22] = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
         ];
         let parsed = parse("e4 e5 Nf3 Nf6 Nxe5 Nxe4 Nxf7 Kxf7 d4 Nxf2 Kxf2 d5 Nc3 Nc6 Nxd5 Qxd5 Kg1 Nxd4 Qxd4 Qxd4+ Be3 Qxe3#");
-        let decompressed = decompress(&bytes[..], 22)?;
+        let decompressed = decompress(&bytes[..], 22).unwrap();
         assert_eq!(parsed, decompressed);
-        Ok(())
     }
 
     const PGNS: [&str; 114] = [
@@ -319,71 +315,62 @@ mod test_move_compression {
 
 mod test_position_compression {
     use crate::position::{compress, decompress};
-    use crate::Error;
     use shakmaty::fen::Fen;
 
     #[test]
-    fn test_roundtrips() -> Result<(), Error> {
+    fn test_roundtrips() {
         // These tests are copied from the Lichess scalachess tests:
         // https://github.com/lichess-org/scalachess/blob/31cdcb1b309e6c368c78ebf7f5832e2df9ff83eb/test-kit/src/test/scala/format/BinaryFenTest.scala
-        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 1")?;
-        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 1")?;
-        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 2")?;
-        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 2")?;
-        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 100 432")?;
-        assert_roundtrip("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1")?;
-        assert_roundtrip("4nrk1/1pp3pp/p4p2/4P3/2BB1n2/8/PP3P1P/2K3R1 b - - 1 25")?;
-        assert_roundtrip("5k2/6p1/8/1Pp5/6P1/8/8/3K4 w - c6 0 1")?;
-        assert_roundtrip("4k3/8/8/8/3pP3/8/6N1/7K b - e3 0 1")?;
-        assert_roundtrip("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1")?;
-        assert_roundtrip("r1k1r2q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K1R2Q w KQkq - 0 1")?;
-        assert_roundtrip("r1k2r1q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K2R1Q w KQkq - 0 1")?;
-        assert_roundtrip("8/8/8/4B2b/6nN/8/5P2/2R1K2k w Q - 1 1")?;
-        assert_roundtrip("2r5/8/8/8/8/8/6PP/k2KR3 w K - 0 2")?;
-        assert_roundtrip("8/8/8/1k6/3Pp3/8/8/4KQ2 b - d3 3 1")?;
-        assert_roundtrip("r2r3k/p7/3p4/8/8/P6P/8/R3K2R b KQq - 0 4")?;
-
-        Ok(())
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 1");
+        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 1");
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 0 2");
+        assert_roundtrip("8/8/8/8/8/8/8/8 b - - 0 2");
+        assert_roundtrip("8/8/8/8/8/8/8/8 w - - 100 432");
+        assert_roundtrip("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1");
+        assert_roundtrip("4nrk1/1pp3pp/p4p2/4P3/2BB1n2/8/PP3P1P/2K3R1 b - - 1 25");
+        assert_roundtrip("5k2/6p1/8/1Pp5/6P1/8/8/3K4 w - c6 0 1");
+        assert_roundtrip("4k3/8/8/8/3pP3/8/6N1/7K b - e3 0 1");
+        assert_roundtrip("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1");
+        assert_roundtrip("r1k1r2q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K1R2Q w KQkq - 0 1");
+        assert_roundtrip("r1k2r1q/p1ppp1pp/8/8/8/8/P1PPP1PP/R1K2R1Q w KQkq - 0 1");
+        assert_roundtrip("8/8/8/4B2b/6nN/8/5P2/2R1K2k w Q - 1 1");
+        assert_roundtrip("2r5/8/8/8/8/8/6PP/k2KR3 w K - 0 2");
+        assert_roundtrip("8/8/8/1k6/3Pp3/8/8/4KQ2 b - d3 3 1");
+        assert_roundtrip("r2r3k/p7/3p4/8/8/P6P/8/R3K2R b KQq - 0 4");
     }
 
-    fn assert_roundtrip(fen: &str) -> Result<(), Error> {
+    fn assert_roundtrip(fen: &str) {
         println!("{fen}");
         let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
 
-        let roundtrip = decompress(&compress(&position)?)?;
+        let roundtrip = decompress(&compress(&position).unwrap()).unwrap();
 
         assert_eq!(fen, format!("{}", Fen::from_setup(roundtrip)));
-
-        Ok(())
     }
 
     #[test]
-    fn test_stable_format() -> Result<(), Error> {
-        assert_stability("8/8/8/8/8/8/8/8 w - - 0 1", "0000000000000000")?;
-        assert_stability("8/8/8/8/8/8/8/8 b - - 0 1", "00000000000000000001")?;
-        assert_stability("8/8/8/8/8/8/8/8 b - - 100 432", "000000000000000064df06")?;
+    fn test_stable_format() {
+        assert_stability("8/8/8/8/8/8/8/8 w - - 0 1", "0000000000000000");
+        assert_stability("8/8/8/8/8/8/8/8 b - - 0 1", "00000000000000000001");
+        assert_stability("8/8/8/8/8/8/8/8 b - - 100 432", "000000000000000064df06");
         assert_stability(
             "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1",
             "ffff00001000efff2d844ad200000000111111113e955fe3",
-        )?;
+        );
         assert_stability(
             "5k2/6p1/8/1Pp5/6P1/8/8/3K4 w - c6 0 1",
             "20400006400000080ac0b1",
-        )?;
+        );
         assert_stability(
             "4k3/8/8/8/3pP3/8/6N1/7K b - e3 0 1",
             "10000000180040802ac10f",
-        )?;
-
-        Ok(())
+        );
     }
 
-    fn assert_stability(fen: &str, encoded_hex: &str) -> Result<(), Error> {
+    fn assert_stability(fen: &str, encoded_hex: &str) {
         let position = Fen::from_ascii(fen.as_bytes()).unwrap().into_setup();
         let expected = hex::decode(encoded_hex).unwrap();
         let compressed_position = compress(&position).unwrap();
         assert_eq!(compressed_position, expected);
-
-        Ok(())
     }
 }

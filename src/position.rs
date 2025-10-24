@@ -21,12 +21,86 @@ use shakmaty::{
     Role::*,
     Setup, Square,
 };
+use std::fmt::{Display, Formatter};
 use std::num::NonZero;
 
-use crate::Error;
+/// Errors that can occur while compressing a position.
+#[derive(Debug)]
+pub enum CompressError {
+    /// I/O error from the target data sink.
+    IO(std::io::Error),
+    /// Attempt to offset a square out of the chess board.
+    SquareOffset(Square, i32),
+}
+
+impl From<std::io::Error> for CompressError {
+    fn from(value: std::io::Error) -> Self {
+        Self::IO(value)
+    }
+}
+
+impl std::error::Error for CompressError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let Self::IO(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for CompressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompressError::IO(e) => write!(f, "IO error: {e}"),
+            CompressError::SquareOffset(sq, i) => {
+                write!(f, "Attempted to offset {sq} by {i} out of the board")
+            }
+        }
+    }
+}
+
+/// Errors that can occur while decompressing a position.
+#[derive(Debug)]
+pub enum DecompressError {
+    /// Premature end of input.
+    MissingBytes,
+    /// Attempt to offset a square out of the chess board.
+    SquareOffset(Square, i32),
+    /// Error while reading a LEB128 encoded value.
+    Leb128(leb128::read::Error),
+}
+
+impl From<leb128::read::Error> for DecompressError {
+    fn from(value: leb128::read::Error) -> Self {
+        Self::Leb128(value)
+    }
+}
+
+impl std::error::Error for DecompressError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let Self::Leb128(e) = self {
+            Some(e)
+        } else {
+            None
+        }
+    }
+}
+
+impl Display for DecompressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DecompressError::MissingBytes => write!(f, "Missing input bytes to decompress"),
+            DecompressError::SquareOffset(sq, i) => {
+                write!(f, "Attempted to offset {sq} by {i} out of the board")
+            }
+            DecompressError::Leb128(e) => write!(f, "Leb128 error: {e}"),
+        }
+    }
+}
 
 /// Compress a position.
-pub fn compress(position: &Setup) -> Result<Vec<u8>, Error> {
+pub fn compress(position: &Setup) -> Result<Vec<u8>, CompressError> {
     let mut result = Vec::new();
 
     let board = &position.board;
@@ -41,7 +115,7 @@ pub fn compress(position: &Setup) -> Result<Vec<u8>, Error> {
             let offset = if position.turn == Black { 8 } else { -8 };
             sq.offset(offset)
                 .map(Square::into)
-                .ok_or(Error::SquareOffsetError(sq, offset))
+                .ok_or(CompressError::SquareOffset(sq, offset))
         })
         .transpose()?
         .unwrap_or(Bitboard::EMPTY);
@@ -60,7 +134,7 @@ pub fn compress(position: &Setup) -> Result<Vec<u8>, Error> {
         );
         let upper_half = maybe_pair
             .map(|(sq, piece)| {
-                Ok::<_, Error>(piece_value(
+                Ok::<_, CompressError>(piece_value(
                     piece,
                     sq,
                     black_turn,
@@ -170,11 +244,11 @@ fn piece_value(
 }
 
 /// Decompress a position.
-pub fn decompress(mut bytes: &[u8]) -> Result<Setup, Error> {
+pub fn decompress(mut bytes: &[u8]) -> Result<Setup, DecompressError> {
     let occupied = Bitboard(u64::from_be_bytes(
         bytes
             .get(0..8)
-            .ok_or(Error::MissingBytes)?
+            .ok_or(DecompressError::MissingBytes)?
             .try_into()
             .unwrap(),
     ));
@@ -185,7 +259,7 @@ pub fn decompress(mut bytes: &[u8]) -> Result<Setup, Error> {
     let mut read_more = true;
     for square in occupied {
         let value = if read_more {
-            byte = *bytes.get(i).ok_or(Error::MissingBytes)?;
+            byte = *bytes.get(i).ok_or(DecompressError::MissingBytes)?;
             i += 1;
             byte & 0x0f
         } else {
@@ -204,7 +278,7 @@ pub fn decompress(mut bytes: &[u8]) -> Result<Setup, Error> {
             setup.ep_square = Some(
                 square
                     .offset(offset)
-                    .ok_or(Error::SquareOffsetError(square, offset))?,
+                    .ok_or(DecompressError::SquareOffset(square, offset))?,
             );
         } else if value == 13 || value == 14 {
             setup.castling_rights |= square;

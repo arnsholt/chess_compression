@@ -11,47 +11,110 @@
 //! [lichess blog]: https://lichess.org/@/lichess/blog/developer-update-275-improved-game-compression/Wqa7GiAA
 //! [Java implementation]: https://github.com/lichess-org/compression
 
-
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
 use shakmaty::{Chess, Color, Move, Position, Role};
+use std::fmt::{Display, Formatter};
 use std::io::{Read, Write};
 
-use crate::Error;
+/// Errors that can occur while compressing moves.
+#[derive(Debug)]
+pub enum CompressError {
+    /// I/O error from the target data sink.
+    IO(std::io::Error),
+    /// Chess logic error while applying a move to the encoder board state.
+    Chess(Box<shakmaty::PlayError<Chess>>),
+    /// Failed to find the move to encode in the list of legal moves in the position.
+    MoveNotFound,
+}
+
+impl std::error::Error for CompressError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            CompressError::IO(e) => Some(e),
+            CompressError::Chess(e) => Some(e),
+            CompressError::MoveNotFound => None,
+        }
+    }
+}
+
+impl Display for CompressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CompressError::IO(e) => write!(f, "IO error: {e}"),
+            CompressError::Chess(e) => write!(f, "Chess error: {e}"),
+            CompressError::MoveNotFound => write!(f, "Move not found in sorted move list"),
+        }
+    }
+}
+
+/// Errors that can occur while decompressing moves.
+#[derive(Debug)]
+pub enum DecompressError {
+    /// I/O error from the data source.
+    IO(std::io::Error),
+    /// Chess logic error while applying a decompressed move to the decoder board state.
+    Chess(Box<shakmaty::PlayError<Chess>>),
+}
+
+impl std::error::Error for DecompressError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            DecompressError::IO(e) => Some(e),
+            DecompressError::Chess(e) => Some(e),
+        }
+    }
+}
+
+impl Display for DecompressError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DecompressError::IO(e) => write!(f, "IO error: {e}"),
+            DecompressError::Chess(e) => write!(f, "Chess error: {e}"),
+        }
+    }
+}
 
 /* Public API: */
 /// Compress a sequence of moves from the starting position.
-pub fn compress(moves: &[Move]) -> Result<Vec<u8>, Error> {
+pub fn compress(moves: &[Move]) -> Result<Vec<u8>, CompressError> {
     compress_from(moves, Chess::default())
 }
 
 /// Compress a sequence of moves from a given position.
-pub fn compress_from(moves: &[Move], position: Chess) -> Result<Vec<u8>, Error> {
-    let mut position = position;
+pub fn compress_from(moves: &[Move], mut position: Chess) -> Result<Vec<u8>, CompressError> {
     let mut output = Vec::new();
     let mut writer = BitWriter::new(&mut output);
     for m in moves {
         write_move(m, &position, &mut writer)?;
-        position = position.play(m).map_err(|e| Error::Chess(Box::new(e)))?;
+        position = position
+            .play(m)
+            .map_err(|e| CompressError::Chess(Box::new(e)))?;
     }
-    writer.pad_to_byte().map_err(Error::IO)?;
+    writer.pad_to_byte().map_err(CompressError::IO)?;
     Ok(output)
 }
 
 /// Decompress a given number of moves from the starting position.
-pub fn decompress<R: Read>(input: R, plies: i32) -> Result<Vec<Move>, Error> {
+pub fn decompress<R: Read>(input: R, plies: i32) -> Result<Vec<Move>, DecompressError> {
     decompress_from(input, plies, Chess::default())
 }
 
 /// Decompress a given number of moves from a given position.
-pub fn decompress_from<R: Read>(input: R, plies: i32, position: Chess) -> Result<Vec<Move>, Error> {
+pub fn decompress_from<R: Read>(
+    input: R,
+    plies: i32,
+    position: Chess,
+) -> Result<Vec<Move>, DecompressError> {
     let mut reader = BitReader::<_, MSB>::new(input);
     let mut position = position;
     let mut moves = Vec::new();
 
     for _i in 0..plies {
         let m = read_move(&mut reader, &position)?;
-        position = position.play(&m).map_err(|e| Error::Chess(Box::new(e)))?;
+        position = position
+            .play(&m)
+            .map_err(|e| DecompressError::Chess(Box::new(e)))?;
         moves.push(m);
     }
 
@@ -67,18 +130,21 @@ pub fn write_move<W: Write>(
     m: &Move,
     position: &Chess,
     writer: &mut BitWriter<W>,
-) -> Result<(), Error> {
+) -> Result<(), CompressError> {
     let moves = sorted_moves(position);
     let idx = moves.into_iter().position(|r| r == *m);
     if let Some(idx) = idx {
         write(idx as u8, writer)
     } else {
-        Err(Error::MoveNotFound)
+        Err(CompressError::MoveNotFound)
     }
 }
 
 /// Low-level function that reads a single move from a [`BitReader`].
-pub fn read_move<R: Read>(reader: &mut BitReader<R, MSB>, position: &Chess) -> Result<Move, Error> {
+pub fn read_move<R: Read>(
+    reader: &mut BitReader<R, MSB>,
+    position: &Chess,
+) -> Result<Move, DecompressError> {
     let idx = read(reader)?;
     let moves = sorted_moves(position);
     Ok(moves[idx as usize].clone())
@@ -456,19 +522,19 @@ fn sorted_moves(position: &Chess) -> Vec<Move> {
         .collect()
 }
 
-fn write<W: Write>(value: u8, writer: &mut BitWriter<W>) -> Result<(), Error> {
+fn write<W: Write>(value: u8, writer: &mut BitWriter<W>) -> Result<(), CompressError> {
     let code = &CODES[value as usize];
     writer
         .write_bits(code.0, code.1 as usize)
-        .map_err(Error::IO)
+        .map_err(CompressError::IO)
 }
 
-fn read<R: Read>(reader: &mut BitReader<R, MSB>) -> Result<u8, Error> {
+fn read<R: Read>(reader: &mut BitReader<R, MSB>) -> Result<u8, DecompressError> {
     let mut node: &Node = &ROOT;
     loop {
         match node {
             Node::Interior { zero, one } => {
-                node = if reader.read_bit().map_err(Error::IO)? {
+                node = if reader.read_bit().map_err(DecompressError::IO)? {
                     one
                 } else {
                     zero
