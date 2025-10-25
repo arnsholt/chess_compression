@@ -88,7 +88,7 @@ pub fn compress_from(moves: &[Move], mut position: Chess) -> Result<Vec<u8>, Com
     for m in moves {
         write_move(m, &position, &mut writer)?;
         position = position
-            .play(m)
+            .play(*m)
             .map_err(|e| CompressError::Chess(Box::new(e)))?;
     }
     writer.pad_to_byte().map_err(CompressError::IO)?;
@@ -113,7 +113,7 @@ pub fn decompress_from<R: Read>(
     for _i in 0..plies {
         let m = read_move(&mut reader, &position)?;
         position = position
-            .play(&m)
+            .play(m)
             .map_err(|e| DecompressError::Chess(Box::new(e)))?;
         moves.push(m);
     }

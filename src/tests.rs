@@ -1,18 +1,18 @@
 #[cfg(test)]
 mod test_move_compression {
+    use std::ops::ControlFlow;
     // These tests are copied from the Lichess compression tests:
     // https://github.com/lichess-org/compression/blob/master/src/test/scala/HuffmanPgnTest.scala
     use base64::Engine;
-    use pgn_reader::{BufferedReader, SanPlus, Skip};
+    use pgn_reader::{Reader, SanPlus, Skip};
     use shakmaty::{Chess, Move, Position};
 
     use crate::moves::{compress, decompress};
 
     fn parse(line: &str) -> Vec<Move> {
-        let mut reader = BufferedReader::new_cursor(line);
+        let mut reader = Reader::new(line.as_bytes());
         let mut visitor = Visitor {
             position: Chess::default(),
-            moves: Vec::new(),
         };
         reader.read_game(&mut visitor).unwrap().unwrap()
     }
@@ -284,31 +284,49 @@ mod test_move_compression {
 
     struct Visitor {
         position: Chess,
-        moves: Vec<Move>,
     }
 
     impl pgn_reader::Visitor for Visitor {
-        type Result = Vec<Move>;
+        //type Result = Vec<Move>;
+        type Tags = ();
+        type Movetext = Vec<Move>;
+        type Output = Vec<Move>;
 
-        fn begin_game(&mut self) {
+        fn begin_tags(&mut self) -> ControlFlow<Self::Output, Self::Tags> {
+            ControlFlow::Continue(())
+        }
+
+        fn begin_movetext(
+            &mut self,
+            _tags: Self::Tags,
+        ) -> ControlFlow<Self::Output, Self::Movetext> {
             self.position = Chess::default();
+            ControlFlow::Continue(Vec::new())
         }
 
-        fn end_game(&mut self) -> Self::Result {
-            std::mem::take(&mut self.moves)
+        fn end_game(&mut self, movetext: Self::Movetext) -> Self::Output {
+            movetext
         }
 
-        fn begin_variation(&mut self) -> Skip {
-            Skip(true)
+        fn begin_variation(
+            &mut self,
+            _movetext: &mut Self::Movetext,
+        ) -> ControlFlow<Self::Output, Skip> {
+            ControlFlow::Continue(Skip(true))
         }
 
-        fn san(&mut self, san: SanPlus) {
+        fn san(
+            &mut self,
+            movetext: &mut Self::Movetext,
+            san: SanPlus,
+        ) -> ControlFlow<Self::Output> {
             let m = san
                 .san
                 .to_move(&self.position)
                 .expect("Bad algebraic notation");
-            self.position.play_unchecked(&m);
-            self.moves.push(m);
+            self.position.play_unchecked(m);
+            movetext.push(m);
+            ControlFlow::Continue(())
         }
     }
 }
@@ -345,7 +363,7 @@ mod test_position_compression {
 
         let roundtrip = decompress(&compress(&position).unwrap()).unwrap();
 
-        assert_eq!(fen, format!("{}", Fen::from_setup(roundtrip)));
+        assert_eq!(fen, format!("{}", Fen::try_from_setup(roundtrip).unwrap()));
     }
 
     #[test]
