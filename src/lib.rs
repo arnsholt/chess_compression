@@ -5,8 +5,7 @@
 //! code is split into two modules, one for compressing moves and one for
 //! positions.
 
-#[macro_use]
-extern crate lazy_static;
+pub use shakmaty;
 
 pub mod moves;
 pub mod position;

@@ -13,6 +13,7 @@
 
 use bitbit::{BitReader, BitWriter, MSB};
 use itertools::Itertools;
+use lazy_static::lazy_static;
 use shakmaty::{Chess, Color, Move, Position, Role};
 use std::fmt::{Display, Formatter};
 use std::io::{Read, Write};
